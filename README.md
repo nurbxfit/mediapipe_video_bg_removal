@@ -4,6 +4,11 @@ Simple script demo, on how to remove background from a video.
 It use [google mediapipe segmentation solution](https://developers.google.com/mediapipe/solutions/vision/image_segmenter#configurations_options), to perform selfie segmentation on the video
 then it seperate the background from the segmented foreground.
 
+# Requirements
+
+1. [FFmpeg](https://www.ffmpeg.org/download.html)
+2. opencv
+
 # How to run
 
 1. cd into this directory
