@@ -25,7 +25,7 @@ def create_output_process(destination_path,width, height, frame_rate = 24):
     output_file_path = os.path.join(destination_path,'output.mp4')
     output_process = (
             ffmpeg.input('pipe:', format='rawvideo', pix_fmt='rgba', s='{}x{}'.format(width, height))
-            .output(output_file_path, vcodec='libx264', pix_fmt='yuv420p', r=frame_rate)
+            .output(output_file_path, vcodec='libx264', pix_fmt='yuv420p', r=frame_rate,colorspace='bt709')
             .overwrite_output()
             .run_async(pipe_stdin=True)
         )
