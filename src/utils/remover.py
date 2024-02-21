@@ -42,15 +42,18 @@ def process_video(video_path,model_path=MODEL_PATH):
                 # Process the frame
                 removed_bg = remove_bg(frame, segmenter)
                 added_bg = apply_bg(removed_bg)
-                added_fg = apply_fg(added_bg,os.path.join('overlays','ketupat-2-left.png'),position=[0,0], resize=[0.2,0.2],alignment="left")
-                added_fg = apply_fg(added_fg,os.path.join('overlays','ketupat-2-right.png'),position=[0,0], resize=[0.2,0.2],alignment="right")
+
+
+                # # maybe can try use ffmpeg outside of this process (to reduce time spent here)
+                # added_fg = apply_fg(added_bg,os.path.join('overlays','ketupat-2-left.png'),position=[0,0], resize=[0.2,0.2],alignment="left") 
+                # added_fg = apply_fg(added_fg,os.path.join('overlays','ketupat-2-right.png'),position=[0,0], resize=[0.2,0.2],alignment="right")
                 
                 # write it to file
                 ffmpeg_process.stdin.write(added_bg)
                 frame_count += 1 # just for tqdm
                 pbar.update(1)
 
-                # show_debug(added_fg)
+                # show_debug(added_bg)
                 # show_debug(removed_bg,width,height)
 
                 if cv2.waitKey(5) & 0xFF == 27:
@@ -61,17 +64,26 @@ def process_video(video_path,model_path=MODEL_PATH):
             ffmpeg_process.wait()
 
 
-def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0)):
+def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0), dilate_kernel_size=5, blur_kernel_size=5):
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.array(frame))
 
     segmentation_result = selfie_segmentation.segment(image)
     category_mask = segmentation_result.category_mask
 
     # Create an alpha channel based on the category mask
-    alpha_channel = (category_mask.numpy_view() > 0.1).astype(np.uint8) * 255
+    # alpha_channel = (category_mask.numpy_view() > 0.3).astype(np.uint8) * 255
 
     # Create a mask where person's region is white and background is black
-    mask = (category_mask.numpy_view() > 0.1).astype(np.uint8) * 255
+    mask = (category_mask.numpy_view() > 0.3).astype(np.uint8) * 255
+    alpha_channel = mask
+
+    # Perform dilation and erosion to smooth out the edges of the mask
+    kernel = np.ones((dilate_kernel_size, dilate_kernel_size), np.uint8)
+    mask = cv2.dilate(mask, kernel, iterations=1)
+    mask = cv2.erode(mask, kernel, iterations=1)
+
+    # Apply Gaussian blur to the mask
+    mask = cv2.GaussianBlur(mask, (blur_kernel_size, blur_kernel_size), 0)
 
     # Invert the mask to make the background white and person's region black
     inverted_mask = cv2.bitwise_not(mask)
