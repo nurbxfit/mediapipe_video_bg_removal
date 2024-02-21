@@ -2,6 +2,7 @@ import time
 from utils.remover import process_video
 
 VIDEO_INPUT_PATH='input/video-input.mp4'
+# VIDEO_INPUT_PATH='input/kid-dance.mp4'
 
 def run():
     start_time = time.time()

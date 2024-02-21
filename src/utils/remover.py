@@ -6,7 +6,7 @@ from utils.video import get_video_info, read_video, create_output_process
 import math
 import numpy as np
 from tqdm import tqdm
-from utils.bg_overlay import apply_bg
+from utils.bg_overlay import apply_bg, apply_fg
 
 
 MODEL_PATH=os.path.join('models/selfie_segmenter.tflite')
@@ -42,18 +42,15 @@ def process_video(video_path,model_path=MODEL_PATH):
                 # Process the frame
                 removed_bg = remove_bg(frame, segmenter)
                 added_bg = apply_bg(removed_bg)
-
-                # Convert removed_bg to np.uint8
-                output_uint8 = (added_bg * 255).astype(np.uint8)
+                added_fg = apply_fg(added_bg,os.path.join('overlays','ketupat-2-left.png'),position=[0,0], resize=[0.2,0.2],alignment="left")
+                added_fg = apply_fg(added_fg,os.path.join('overlays','ketupat-2-right.png'),position=[0,0], resize=[0.2,0.2],alignment="right")
                 
                 # write it to file
-                ffmpeg_process.stdin.write(output_uint8.tobytes())
+                ffmpeg_process.stdin.write(added_bg)
                 frame_count += 1 # just for tqdm
                 pbar.update(1)
 
-
-
-                show_debug(added_bg)
+                # show_debug(added_fg)
                 # show_debug(removed_bg,width,height)
 
                 if cv2.waitKey(5) & 0xFF == 27:
@@ -66,6 +63,7 @@ def process_video(video_path,model_path=MODEL_PATH):
 
 def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0)):
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.array(frame))
+
     segmentation_result = selfie_segmentation.segment(image)
     category_mask = segmentation_result.category_mask
 
@@ -79,7 +77,7 @@ def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0)):
     inverted_mask = cv2.bitwise_not(mask)
 
     # Convert the frame to RGBA format
-    frame_bgra = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
+    frame_bgra = cv2.cvtColor(frame, cv2.COLOR_BGR2RGBA)
 
     # Set the background to the replacement color 
     background = np.full_like(frame_bgra, replacement_color + (255,), dtype=np.uint8)
