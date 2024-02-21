@@ -8,7 +8,9 @@ def get_video_info(video_path):
         video_stream = get_video_stream(probe['streams'])
         width = video_stream['width']
         height = video_stream['height']
-        return width, height
+        frame_rate = eval(video_stream['r_frame_rate'])
+        duration = eval(video_stream['duration'])
+        return width, height, frame_rate, duration
     except ffmpeg.Error as e:
         print("ffmpeg_error:", e.stderr)
         return
@@ -33,18 +35,25 @@ def create_output_process(destination_path,width, height, frame_rate = 24):
 
 def read_video(video_path, width, height, target_frame_rate=24):
     # Input video file with adjusted buffer size
+    width, height, frame_rate, duration = get_video_info(video_path)
     process = (
         ffmpeg.input(video_path, probesize=2*1024*1024)
         .output('pipe:', format='rawvideo', pix_fmt='rgb24', r=target_frame_rate)
         .run_async(pipe_stdout=True)
     )
 
-    while True:
+    timestamp_incremental = 1 / frame_rate 
+    timestamp = 0
+    frame_index = 0
+
+    while timestamp < duration:
         in_bytes = process.stdout.read(width * height * 3)
         if not in_bytes:
             break
         frame = np.frombuffer(in_bytes, np.uint8).reshape([height, width, 3])
-        yield frame
+        yield frame, int(frame_index * timestamp_incremental * 1000)
+        timestamp += timestamp_incremental
+        frame_index +=1
 
     process.communicate()
 

@@ -7,7 +7,8 @@ import math
 import numpy as np
 from tqdm import tqdm
 from utils.bg_overlay import apply_bg, apply_fg
-
+import concurrent.futures as cf
+from mediapipe.python._framework_bindings.timestamp import Timestamp
 
 MODEL_PATH=os.path.join('models/selfie_segmenter.tflite')
 DESIRED_HEIGHT = 1080
@@ -22,52 +23,55 @@ def process_video(video_path,model_path=MODEL_PATH):
     ImageSegmenter = mp.tasks.vision.ImageSegmenter
     ImageSegmenterOptions = mp.tasks.vision.ImageSegmenterOptions
     VisionRunningMode = mp.tasks.vision.RunningMode
+    VisionRunningModeOption = VisionRunningMode.VIDEO
+    # VisionRunningModeOption = VisionRunningMode.IMAGE
 
     options = ImageSegmenterOptions(
         base_options=BaseOptions(model_asset_path=model_path),
-        running_mode=VisionRunningMode.IMAGE,
+        running_mode=VisionRunningModeOption,
         output_category_mask=True,
     )
 
     with ImageSegmenter.create_from_options(options) as segmenter:
-        width, height = get_video_info(video_path)
-        print(f"WIDTH:{width}, HEIGHT: {height}")
+        width, height, frame_rate, duration = get_video_info(video_path)
 
         ffmpeg_process = create_output_process('output',width,height)
 
-        frame_count = 0
-        frames = read_video(video_path, width, height)
-        with tqdm(desc='Processing video', unit=' frames') as pbar:
-            for frame in frames:
-                # Process the frame
-                removed_bg = remove_bg(frame, segmenter)
-                added_bg = apply_bg(removed_bg)
+        target_frame_rate = 24
+        frames = read_video(video_path, width, height, target_frame_rate)
+        processed_frames = []
+        with cf.ThreadPoolExecutor() as executor:
+            futures = []
+            for frame, timestamp in frames:
+                future = executor.submit(process_frames,frame, segmenter, timestamp)
+                futures.append(future)
+            with tqdm(desc='Processing video', unit=' frames') as pbar:
+                for future in cf.as_completed(futures):
+                    processed_frame = future.result()
+                    processed_frames.append(processed_frame)
+                    pbar.update(1)
 
+            
 
-                # # maybe can try use ffmpeg outside of this process (to reduce time spent here)
-                # added_fg = apply_fg(added_bg,os.path.join('overlays','ketupat-2-left.png'),position=[0,0], resize=[0.2,0.2],alignment="left") 
-                # added_fg = apply_fg(added_fg,os.path.join('overlays','ketupat-2-right.png'),position=[0,0], resize=[0.2,0.2],alignment="right")
-                
-                # write it to file
-                ffmpeg_process.stdin.write(added_bg)
-                frame_count += 1 # just for tqdm
+        with tqdm(desc="Saving video", unit=" frames") as pbar:
+            for frame in processed_frames:
+                ffmpeg_process.stdin.write(frame)
                 pbar.update(1)
 
-                # show_debug(added_bg)
-                # show_debug(removed_bg,width,height)
+        cv2.destroyAllWindows()
+        ffmpeg_process.stdin.close()
+        ffmpeg_process.wait()
+                
 
-                if cv2.waitKey(5) & 0xFF == 27:
-                    break
+def process_frames(frame, segmenter, timestamp):
+    removed_bg = remove_bg(frame, segmenter, timestamp)
+    return apply_bg(removed_bg)
 
-            cv2.destroyAllWindows()
-            ffmpeg_process.stdin.close()
-            ffmpeg_process.wait()
-
-
-def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0), dilate_kernel_size=5, blur_kernel_size=5):
+def remove_bg(frame, selfie_segmentation, timestamp, replacement_color=(0, 0, 0), dilate_kernel_size=5, blur_kernel_size=5):
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.array(frame))
 
-    segmentation_result = selfie_segmentation.segment(image)
+    segmentation_result = selfie_segmentation.segment_for_video(image,timestamp)
+    # segmentation_result = selfie_segmentation.segment(image)
     category_mask = segmentation_result.category_mask
 
     # Create an alpha channel based on the category mask
