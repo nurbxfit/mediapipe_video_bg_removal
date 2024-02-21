@@ -6,7 +6,7 @@ from utils.video import get_video_info, read_video, create_output_process
 import math
 import numpy as np
 from tqdm import tqdm
-import ffmpeg
+from utils.bg_overlay import apply_bg
 
 
 MODEL_PATH=os.path.join('models/selfie_segmenter.tflite')
@@ -14,7 +14,7 @@ DESIRED_HEIGHT = 1080
 DESIRED_WIDTH = 920
 BG_COLOR = (0,0,0) # black
 
-def remove_bg(video_path,model_path=MODEL_PATH):
+def process_video(video_path,model_path=MODEL_PATH):
     print(f"video_path:{video_path}")
     print(f"model_path:{model_path}")
 
@@ -32,12 +32,6 @@ def remove_bg(video_path,model_path=MODEL_PATH):
     with ImageSegmenter.create_from_options(options) as segmenter:
         width, height = get_video_info(video_path)
         print(f"WIDTH:{width}, HEIGHT: {height}")
-        # ffmpeg_process = (
-        #     ffmpeg.input('pipe:', format='rawvideo', pix_fmt='rgba', s='{}x{}'.format(width, height))
-        #     .output('output.mp4', vcodec='libx264', r=24)
-        #     .overwrite_output()
-        #     .run_async(pipe_stdin=True)
-        # )
 
         ffmpeg_process = create_output_process('output',width,height)
 
@@ -46,17 +40,21 @@ def remove_bg(video_path,model_path=MODEL_PATH):
         with tqdm(desc='Processing video', unit=' frames') as pbar:
             for frame in frames:
                 # Process the frame
-                output_image = process_video(frame, segmenter)
+                removed_bg = remove_bg(frame, segmenter)
+                added_bg = apply_bg(removed_bg)
 
-                # Convert output_image to np.uint8
-                output_image_uint8 = (output_image * 255).astype(np.uint8)
+                # Convert removed_bg to np.uint8
+                output_uint8 = (added_bg * 255).astype(np.uint8)
                 
                 # write it to file
-                ffmpeg_process.stdin.write(output_image_uint8.tobytes())
+                ffmpeg_process.stdin.write(output_uint8.tobytes())
                 frame_count += 1 # just for tqdm
                 pbar.update(1)
 
-                # show_debug(output_image,width,height)
+
+
+                show_debug(added_bg)
+                # show_debug(removed_bg,width,height)
 
                 if cv2.waitKey(5) & 0xFF == 27:
                     break
@@ -66,29 +64,34 @@ def remove_bg(video_path,model_path=MODEL_PATH):
             ffmpeg_process.wait()
 
 
-def process_video(frame, selfie_segmentation):
+def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0)):
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.array(frame))
     segmentation_result = selfie_segmentation.segment(image)
     category_mask = segmentation_result.category_mask
 
-    # Convert the BGR image back to RGB
-    # image_data = cv2.cvtColor(image.numpy_view(), cv2.COLOR_RGB2BGR)
-    image_data = cv2.cvtColor(image.numpy_view(), cv2.COLOR_RGB2BGR)
+    # Create an alpha channel based on the category mask
+    alpha_channel = (category_mask.numpy_view() > 0.1).astype(np.uint8) * 255
 
+    # Create a mask where person's region is white and background is black
+    mask = (category_mask.numpy_view() > 0.1).astype(np.uint8) * 255
 
-    # Make background transparent
-    bg_image = np.zeros((image_data.shape[0], image_data.shape[1], 4), dtype=np.uint8)
-    # bg_image[:, :, :3] = BG_COLOR  # Set RGB values for the background
-    # bg_image[:, :, 3] = 0  # Set alpha channel to 0 for the background
+    # Invert the mask to make the background white and person's region black
+    inverted_mask = cv2.bitwise_not(mask)
 
-    condition = np.stack((category_mask.numpy_view(),) * 3, axis=-1) <= 0.1
-    # output_image = np.where(condition, image_data, bg_image)
-    # Create an RGBA image by combining the original image and the transparent background
-    output_image = np.zeros_like(bg_image)
-    output_image[:, :, :3] = np.where(condition, image_data, bg_image[:, :, :3])
-    output_image[:, :, 3] = np.where(condition[:, :, 0], 0, bg_image[:, :, 3])
+    # Convert the frame to RGBA format
+    frame_bgra = cv2.cvtColor(frame, cv2.COLOR_RGB2RGBA)
+
+    # Set the background to the replacement color 
+    background = np.full_like(frame_bgra, replacement_color + (255,), dtype=np.uint8)
+
+    # Combine the frame and the background using the masks and alpha channel
+    output_image = cv2.bitwise_and(frame_bgra, frame_bgra, mask=inverted_mask)
+    output_image += cv2.bitwise_and(background, background, mask=mask)
+    output_image[:, :, 3] = alpha_channel
 
     return output_image
+
+
 
 
 
