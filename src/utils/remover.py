@@ -42,8 +42,8 @@ def process_video(video_path,model_path=MODEL_PATH):
                 # Process the frame
                 removed_bg = remove_bg(frame, segmenter)
                 added_bg = apply_bg(removed_bg)
-                added_fg = apply_fg(added_bg,os.path.join('overlays','ketupat-2-left.png'),position=[0,0], resize=[0.2,0.2],alignment="left")
-                added_fg = apply_fg(added_fg,os.path.join('overlays','ketupat-2-right.png'),position=[0,0], resize=[0.2,0.2],alignment="right")
+                # added_fg = apply_fg(added_bg,os.path.join('overlays','ketupat-2-left.png'),position=[0,0], resize=[0.2,0.2],alignment="left")
+                # added_fg = apply_fg(added_fg,os.path.join('overlays','ketupat-2-right.png'),position=[0,0], resize=[0.2,0.2],alignment="right")
                 
                 # write it to file
                 ffmpeg_process.stdin.write(added_bg)

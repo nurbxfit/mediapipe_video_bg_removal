@@ -35,7 +35,7 @@ def read_video(video_path, width, height, target_frame_rate=24):
     # Input video file with adjusted buffer size
     process = (
         ffmpeg.input(video_path, probesize=2*1024*1024)
-        .output('pipe:', format='rawvideo', pix_fmt='rgb24', r=target_frame_rate)
+        .output('pipe:', format='rawvideo', pix_fmt='bgr24', r=target_frame_rate)
         .run_async(pipe_stdout=True)
     )
 
