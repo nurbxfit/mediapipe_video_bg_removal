@@ -7,7 +7,8 @@ import math
 import numpy as np
 from tqdm import tqdm
 from utils.bg_overlay import apply_bg, apply_fg
-
+from queue import Queue
+import threading
 
 MODEL_PATH=os.path.join('models/selfie_segmenter.tflite')
 DESIRED_HEIGHT = 1080
@@ -25,46 +26,94 @@ def process_video(video_path,model_path=MODEL_PATH):
 
     options = ImageSegmenterOptions(
         base_options=BaseOptions(model_asset_path=model_path),
-        running_mode=VisionRunningMode.IMAGE,
+        # running_mode=VisionRunningMode.IMAGE,
+        running_mode=VisionRunningMode.VIDEO,
         output_category_mask=True,
     )
+
 
     with ImageSegmenter.create_from_options(options) as segmenter:
         width, height = get_video_info(video_path)
         print(f"WIDTH:{width}, HEIGHT: {height}")
 
-        ffmpeg_process = create_output_process('output',width,height)
+        ffmpeg_process = create_output_process('output', width, height)
+        # ffmpeg_process = create_output_process('output',width,height)
 
-        frame_count = 0
-        frames = read_video(video_path, width, height)
-        with tqdm(desc='Processing video', unit=' frames') as pbar:
-            for frame in frames:
-                # Process the frame
-                removed_bg = remove_bg(frame, segmenter)
-                added_bg = apply_bg(removed_bg)
-                # added_fg = apply_fg(added_bg,os.path.join('overlays','ketupat-2-left.png'),position=[0,0], resize=[0.2,0.2],alignment="left")
-                # added_fg = apply_fg(added_fg,os.path.join('overlays','ketupat-2-right.png'),position=[0,0], resize=[0.2,0.2],alignment="right")
-                
-                # write it to file
-                ffmpeg_process.stdin.write(added_bg)
-                frame_count += 1 # just for tqdm
-                pbar.update(1)
+        # frame_count = 0
+        caps_queue = Queue(maxsize=128)
+        processed_queue = Queue(maxsize=128)
+        final_queue = Queue(maxsize=128)
 
-                # show_debug(added_fg)
-                # show_debug(removed_bg,width,height)
+        # Here we create threads for reading,process and writing
+        read_thread = threading.Thread(target=read_frames, args=(video_path, width, height, caps_queue))
+        process_thread = threading.Thread(target=process_frames, args=(segmenter, caps_queue, processed_queue))
+        apply_thread = threading.Thread(target=apply_frames, args=(processed_queue, final_queue))
+        write_thread = threading.Thread(target=write_frames, args=(final_queue, ffmpeg_process))
 
-                if cv2.waitKey(5) & 0xFF == 27:
-                    break
+        # Start the threads
+        read_thread.start()
+        process_thread.start()
+        apply_thread.start()
+        write_thread.start()
 
-            cv2.destroyAllWindows()
-            ffmpeg_process.stdin.close()
-            ffmpeg_process.wait()
+        # Wait for all threads to finish
+        read_thread.join()
+        process_thread.join()
+        apply_thread.join()
+        write_thread.join()
+
+        cv2.destroyAllWindows()
+        ffmpeg_process.stdin.close()
+        ffmpeg_process.wait() 
 
 
-def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0)):
+def read_frames(video_path, width, height, caps_queue, target_frame_rate = 24):
+    caps = read_video(video_path, width, height,target_frame_rate)
+    # with tqdm(desc='Reading video', unit=' frames') as pbar:
+    for cap in caps:
+        frame, timestamp = cap
+        if not timestamp:
+            break
+        caps_queue.put(cap)
+        # pbar.update(1)
+    caps_queue.put(None)
+
+def process_frames(segmenter, caps_queue, processed_queue):
+    while True:
+        cap  = caps_queue.get()
+        if cap is None:
+            break
+        frame, timestamp = cap
+        removed_bg = remove_bg(frame,segmenter,timestamp)
+        
+        processed_queue.put((removed_bg,timestamp))
+    processed_queue.put(None)
+
+def apply_frames(processed_queue,final_queue):
+    while True:
+        processed_frame = processed_queue.get()
+        if processed_frame is None:
+            break
+        frame, timestamp = processed_frame
+        added_bg = apply_bg(frame)
+        final_queue.put((added_bg,timestamp))
+    final_queue.put(None)
+
+def write_frames(final_queue, ffmpeg_process):
+    with tqdm(desc='Saving video', unit=' frames') as pbar:
+        while True: 
+            processed_frame = final_queue.get()
+            if processed_frame is None:
+                break
+            frame, timestamp = processed_frame
+            ffmpeg_process.stdin.write(frame)
+            pbar.update(1)
+
+def remove_bg(frame, selfie_segmentation, timestamp, replacement_color=(0, 0, 0)):
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.array(frame))
 
-    segmentation_result = selfie_segmentation.segment(image)
+    # segmentation_result = selfie_segmentation.segment(image)
+    segmentation_result = selfie_segmentation.segment_for_video(image,timestamp)
     category_mask = segmentation_result.category_mask
 
     # Create an alpha channel based on the category mask
