@@ -7,10 +7,12 @@ OVERLAY_KETUPAT_RIGHT = os.path.join('overlays','ketupat-2-left.png')
 
 def apply_bg(fg_image, bg_image_path = DEFAULT_BG_PATH):
     # Read the background image
+    # background = cv2.imread(bg_image_path,cv2.IMREAD_UNCHANGED)
     background = cv2.imread(bg_image_path)
 
     # Resize the background to match the dimensions of the input frame
     background = cv2.resize(background, (fg_image.shape[1], fg_image.shape[0]))
+    background = cv2.cvtColor(background, cv2.COLOR_BGR2RGBA)
 
     # Create a mask for the foreground image (with removed bg)
     mask = fg_image[:, :, 3]
@@ -32,7 +34,6 @@ def apply_bg(fg_image, bg_image_path = DEFAULT_BG_PATH):
     output_image = np.zeros_like(fg_image)
     output_image[:, :, :3] = result
     output_image[:, :, 3] = mask
-
 
     return output_image
 
