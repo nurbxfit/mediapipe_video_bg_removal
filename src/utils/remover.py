@@ -7,13 +7,15 @@ import math
 import numpy as np
 from tqdm import tqdm
 from utils.bg_overlay import apply_bg, apply_fg
-
+import concurrent.futures as cf
 
 MODEL_PATH=os.path.join('models/selfie_segmenter.tflite')
+# MODEL_PATH=os.path.join('models/selfie_multiclass_256x256.tflite')
 DESIRED_HEIGHT = 1080
 DESIRED_WIDTH = 920
 BG_COLOR = (0,0,0) # black
 
+timestamp = 0
 def process_video(video_path,model_path=MODEL_PATH):
     print(f"video_path:{video_path}")
     print(f"model_path:{model_path}")
@@ -26,45 +28,67 @@ def process_video(video_path,model_path=MODEL_PATH):
     options = ImageSegmenterOptions(
         base_options=BaseOptions(model_asset_path=model_path),
         running_mode=VisionRunningMode.IMAGE,
+        # running_mode=VisionRunningMode.VIDEO,
         output_category_mask=True,
     )
 
+    global timestamp
+    timestamp = 0
     with ImageSegmenter.create_from_options(options) as segmenter:
         width, height = get_video_info(video_path)
         print(f"WIDTH:{width}, HEIGHT: {height}")
 
-        ffmpeg_process = create_output_process('output',width,height)
+        ffmpeg_process = create_output_process('output', width, height)
 
-        frame_count = 0
-        frames = read_video(video_path, width, height)
-        with tqdm(desc='Processing video', unit=' frames') as pbar:
-            for frame in frames:
-                # Process the frame
-                removed_bg = remove_bg(frame, segmenter)
-                added_bg = apply_bg(removed_bg)
-                # added_fg = apply_fg(added_bg,os.path.join('overlays','ketupat-2-left.png'),position=[0,0], resize=[0.2,0.2],alignment="left")
-                # added_fg = apply_fg(added_fg,os.path.join('overlays','ketupat-2-right.png'),position=[0,0], resize=[0.2,0.2],alignment="right")
-                
-                # write it to file
-                ffmpeg_process.stdin.write(added_bg)
-                frame_count += 1 # just for tqdm
-                pbar.update(1)
+        processed_frames = []
+        
+        # here we read the video
+        caps = read_video(video_path, width, height)
+        
+        # here we use threadpool to process each frames
+        with cf.ThreadPoolExecutor() as executor:
+            futures = []
+            for frame, _ in caps:
+                future = executor.submit(process_frames,frame, segmenter, processed_frames)
+                futures.append(future)
+            with tqdm(desc='Processing video', unit=' frames') as pbar:
+                for future in cf.as_completed(futures):
+                    future.result()
+                    pbar.update(1)
 
-                # show_debug(added_fg)
-                # show_debug(removed_bg,width,height)
+        # sort the array, before write it
+        processed_frames.sort(key=lambda x: x[1])
 
-                if cv2.waitKey(5) & 0xFF == 27:
-                    break
+        # write the output into a video
+        with tqdm(desc="Saving video", unit=" frames") as pbar:
+            for frame, _ in processed_frames:
+                if frame is None:
+                    pass
+                else:
+                    ffmpeg_process.stdin.write(frame)
+                    pbar.update(1)
+    
+        cv2.destroyAllWindows()
+        ffmpeg_process.stdin.close()
+        ffmpeg_process.wait() 
 
-            cv2.destroyAllWindows()
-            ffmpeg_process.stdin.close()
-            ffmpeg_process.wait()
+    
+def process_frames(frame, segmenter, processed_queue):
+ 
+    removed_bg, index = remove_bg(frame, segmenter)
+    applied_bg = apply_bg(removed_bg)
+    processed_queue.append((applied_bg,index))
 
 
 def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0)):
+    # print(f"\ntimeStamp:{timestamp}")
+
+    global timestamp
+
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.array(frame))
 
     segmentation_result = selfie_segmentation.segment(image)
+    # segmentation_result = selfie_segmentation.segment_for_video(image,timestamp)
     category_mask = segmentation_result.category_mask
 
     # Create an alpha channel based on the category mask
@@ -87,7 +111,11 @@ def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0)):
     output_image += cv2.bitwise_and(background, background, mask=mask)
     output_image[:, :, 3] = alpha_channel
 
-    return output_image
+    # print(f"\ntimestamp:{timestamp}\n")
+
+    timestamp = timestamp + 1
+
+    return output_image, timestamp
 
 
 

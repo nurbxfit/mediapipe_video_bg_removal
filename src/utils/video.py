@@ -1,6 +1,8 @@
 import ffmpeg
 import os
 import numpy as np
+import cv2
+import time
 
 def get_video_info(video_path):
     try:
@@ -38,15 +40,32 @@ def read_video(video_path, width, height, target_frame_rate=24):
         .output('pipe:', format='rawvideo', pix_fmt='bgr24', r=target_frame_rate)
         .run_async(pipe_stdout=True)
     )
-
+    timestamp = int(time.time_ns() // 1_000_000)
     while True:
         in_bytes = process.stdout.read(width * height * 3)
         if not in_bytes:
             break
         frame = np.frombuffer(in_bytes, np.uint8).reshape([height, width, 3])
-        yield frame
-
+        yield frame, timestamp
+        timestamp = int(time.time_ns() // 1_000_000)
     process.communicate()
+    
+
+def read_video_cv2(video_path,target_frame_rate=24):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise Exception('Failed to open video!')
+    
+    cap.set(cv2.CAP_PROP_FPS, target_frame_rate)
+    
+    while cap.isOpened():
+        ret, frame = cap.read()
+
+        if not ret:
+            raise Exception('Failed to read video!')
+        
+        timestamp = int(cap.get(cv2.CAP_PROP_POS_MSEC))
+        yield frame, timestamp
 
 
 def parse_frame_rate(frame_rate_str): # eg: "60/1" 

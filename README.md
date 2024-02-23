@@ -46,3 +46,12 @@ cd src && python main.py
 ```
 deactivate
 ```
+
+# Updates
+
+## (23/2/2024) Threadpool
+
+- I am able to improve the processing time by using threadpool
+- only takes 30 seconds when using selfie_segmenter model
+- only takes 2.3 minutes when using selfie_multiclass_256x256 model
+- able to remove jitter/glitch on output video when using threadpools.
