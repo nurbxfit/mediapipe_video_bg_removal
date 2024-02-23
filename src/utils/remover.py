@@ -7,15 +7,15 @@ import math
 import numpy as np
 from tqdm import tqdm
 from utils.bg_overlay import apply_bg, apply_fg
-from queue import Queue
-import threading
 import concurrent.futures as cf
 
 MODEL_PATH=os.path.join('models/selfie_segmenter.tflite')
+# MODEL_PATH=os.path.join('models/selfie_multiclass_256x256.tflite')
 DESIRED_HEIGHT = 1080
 DESIRED_WIDTH = 920
 BG_COLOR = (0,0,0) # black
 
+timestamp = 0
 def process_video(video_path,model_path=MODEL_PATH):
     print(f"video_path:{video_path}")
     print(f"model_path:{model_path}")
@@ -32,39 +32,36 @@ def process_video(video_path,model_path=MODEL_PATH):
         output_category_mask=True,
     )
 
-
+    global timestamp
+    timestamp = 0
     with ImageSegmenter.create_from_options(options) as segmenter:
         width, height = get_video_info(video_path)
         print(f"WIDTH:{width}, HEIGHT: {height}")
 
         ffmpeg_process = create_output_process('output', width, height)
-        # ffmpeg_process = create_output_process('output',width,height)
 
-        # frame_count = 0
-        processed_queue = Queue()
-        final_queue = Queue(maxsize=128)
-
-        # Here we create threads for reading,process and writing
-        # read_thread = threading.Thread(target=read_frames, args=(video_path, width, height, caps_queue))
+        processed_frames = []
+        
+        # here we read the video
         caps = read_video(video_path, width, height)
-        index = 0
+        
+        # here we use threadpool to process each frames
         with cf.ThreadPoolExecutor() as executor:
             futures = []
-            for frame, timestamp in caps:
-                future = executor.submit(process_frames,frame, segmenter, index, processed_queue)
+            for frame, _ in caps:
+                future = executor.submit(process_frames,frame, segmenter, processed_frames)
                 futures.append(future)
             with tqdm(desc='Processing video', unit=' frames') as pbar:
                 for future in cf.as_completed(futures):
                     future.result()
-                    index +=1
                     pbar.update(1)
 
-            
+        # sort the array, before write it
+        processed_frames.sort(key=lambda x: x[1])
 
+        # write the output into a video
         with tqdm(desc="Saving video", unit=" frames") as pbar:
-            # for frame in processed_frames:
-            while not processed_queue.empty():
-                frame = processed_queue.get()
+            for frame, _ in processed_frames:
                 if frame is None:
                     pass
                 else:
@@ -76,15 +73,17 @@ def process_video(video_path,model_path=MODEL_PATH):
         ffmpeg_process.wait() 
 
     
-def process_frames(frame, segmenter, timestamp, processed_queue):
+def process_frames(frame, segmenter, processed_queue):
  
-    removed_bg = remove_bg(frame, segmenter, timestamp)
+    removed_bg, index = remove_bg(frame, segmenter)
     applied_bg = apply_bg(removed_bg)
-    processed_queue.put(applied_bg)
+    processed_queue.append((applied_bg,index))
 
 
-def remove_bg(frame, selfie_segmentation, timestamp, replacement_color=(0, 0, 0)):
+def remove_bg(frame, selfie_segmentation, replacement_color=(0, 0, 0)):
     # print(f"\ntimeStamp:{timestamp}")
+
+    global timestamp
 
     image = mp.Image(image_format=mp.ImageFormat.SRGB, data=np.array(frame))
 
@@ -112,7 +111,11 @@ def remove_bg(frame, selfie_segmentation, timestamp, replacement_color=(0, 0, 0)
     output_image += cv2.bitwise_and(background, background, mask=mask)
     output_image[:, :, 3] = alpha_channel
 
-    return output_image
+    # print(f"\ntimestamp:{timestamp}\n")
+
+    timestamp = timestamp + 1
+
+    return output_image, timestamp
 
 
 
