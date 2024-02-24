@@ -17,12 +17,14 @@ def process_frame(image,segmenter):
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=image)
     result = segmenter.segment(mp_image)
     mask = result.category_mask
+    mask = mask.numpy_view()
 
-    removed_bg = manipulator.remove_bg(image,mask)
+    foreground_image = manipulator.remove_bg_v2(image,mask)
 
     new_bg = load_local_image('overlays/xp-bg.jpg')
-    applied_bg = manipulator.blend_bg(removed_bg,new_bg)
+    applied_bg = manipulator.blend_bg(foreground_image,new_bg,mask)
     return applied_bg
+    # return removed_bg
 
 
 def init_segmenter(model_path=MODEL_PATH, running_mode = 'video'):
@@ -48,8 +50,8 @@ def main():
         processed_frame = process_frame(image,segmenter)
         show_debug(processed_frame)
 
-    # cv2.destroyAllWindows()
-    cv2.waitKey(0)
+    # # cv2.destroyAllWindows()
+    # cv2.waitKey(0)
 
 
 def load_local_image(path):

@@ -3,28 +3,38 @@ import numpy as np
 
 # Note: images params here are the numpy array
 #
-def blend_bg(fg,bg):
+def blend_bg(fg,bg,mask):
     
     # Ensure alpha channel for fg
-    fg = create_alpha(fg).astype(float)
-
-    # Ensure alpha channel for bg
-    bg = create_alpha(bg).astype(float)
-
+    fg_mask = (mask < 0.3).astype(np.uint8) * 255
+    bg_mask = (mask > 0.3).astype(np.uint8) * 255
     bg = cv2.resize(bg, (fg.shape[1], fg.shape[0]))
+   
+    bg = cv2.cvtColor(bg,cv2.COLOR_BGR2RGBA)
+    # bg_mask = cv2.bitwise_not(bg)
 
-    blended = fg * 0.5 + bg * 0.5
+    cutof_with_bg_as_mask = cv2.bitwise_and(bg,bg,mask=fg_mask)
+    bg_with_cutof_black = cv2.bitwise_and(bg,bg,mask=bg_mask)
+    # cv2.imshow('fg_mask',fg_mask)
+    # cv2.imshow('bg_mask',bg_mask)
+    # cv2.imshow('bg_with_cutof',bg_with_cutof_black)
+    # cv2.imshow('cutof_with_bg_as_mask',cutof_with_bg_as_mask)
 
-    return (blended * 255).astype(np.uint8)
+    # fg_mask_tiled = np.tile(fg_mask[:,:,None],(1,1,4))
+    print(f"mask:{fg_mask.shape}")
+    print(f"fg:{fg.shape}")
+
+    blended_fg = cv2.addWeighted(fg,1,cutof_with_bg_as_mask,0.2,0)
+    blended_fg_bg = blended_fg + bg_with_cutof_black
+    # gaussian blur
+    output_gaus = cv2.GaussianBlur(blended_fg_bg,(5,5),0)
+    output_gaus = cv2.normalize(output_gaus, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_32F)
+    blended = output_gaus
+    # bg_with_fg_cutout= cv2.bitwise_and(bg_rgba,bg_rgba,mask=fg_mask)
+
+    return (blended).astype(np.uint8)
 
 
-def create_alpha(image):
-    if image.shape[2] == 3:
-        # image_alpha = np.full(image.shape[:2],255,dtype=np.uint8)
-        image = cv2.cvtColor(image,cv2.COLOR_BGR2RGBA)
-        # image = np.concatenate([image,image_alpha],axis=-1)
-
-    return image
 
 # note: frame is numpy  array read from buffer 
 #  frame = np.frombuffer(in_bytes, np.uint8).reshape([height, width, 3])
@@ -51,6 +61,48 @@ def remove_bg(frame,category_mask,replacement_color=(0,0,0)):
     # convert the end output to RGBA
 
     return cv2.cvtColor(output,cv2.COLOR_BGRA2RGBA)
+
+
+def remove_bg_v2(frame,category_mask,replacement_color=(0,0,0)):
+    # Create an alpha channel from the category mask
+    # Lowering the threshold (e.g., 0.05): This includes more pixels in the foreground mask, 
+    # potentially capturing finer details and potentially including some background noise.
+    # Raising the threshold (e.g., 0.15): This excludes more pixels from the foreground mask, 
+    # resulting in a "tighter" segmentation that might miss some true foreground pixels but exclude more background noise.
+    fg_mask_threshold = 0.3
+    fg_mask = (category_mask < fg_mask_threshold).astype(np.uint8) * 255
+    # bg_mask = (category_mask.numpy_view() > 0.1).astype(np.uint8) * 255
+
+    frame_rgba = cv2.cvtColor(frame,cv2.COLOR_BGR2BGRA) # we use BGR to RGBA because the result of mp.Image().segment is BGR
+
+    bg_transparent = np.full_like(frame_rgba, replacement_color + (255,),dtype=np.uint8)
+    # bg_normal = np.full_like(frame_rgba,frame_rgba,dtype=np.uint8)
+    
+    # I want to apply some kind of blending to smooth up the foreground image edges
+    # but I am not sure how to do it.
+    # Apply feathering to the foreground mask
+    # kernel_size = 3  # Adjust kernel size for desired feathering strength
+    # fg_mask_blurred = cv2.GaussianBlur(fg_mask.astype(np.float32), (kernel_size, kernel_size), 0)
+    # fg_mask_blurred = cv2.normalize(fg_mask_blurred, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_32F)  # Normalize to 0-255 range
+
+    #cut the segmented fg using the mask, then we left with only the foreground image
+    # Isolate the foreground with alpha channel using the feathered mask
+    # fg_mask_blurred = fg_mask_blurred.astype(np.uint8)
+    # fg_with_removed_bg = cv2.bitwise_and(frame_rgba, frame_rgba, mask=fg_mask[..., None])
+
+    fg_with_removed_bg = cv2.bitwise_and(frame_rgba, frame_rgba,mask=fg_mask) 
+    bg_mask = cv2.bitwise_not(fg_mask)
+    # then we transparent transparent background
+    # we cut holes in it matching the foregound image
+    bg_transparent_with_removed_fg = cv2.bitwise_and(bg_transparent, bg_transparent, mask=bg_mask)
+
+    # then we stich it togerther forming a fg image + transparent bg
+    output = fg_with_removed_bg + bg_transparent_with_removed_fg
+
+    return cv2.cvtColor(output,cv2.COLOR_BGRA2RGBA)
+
+
+
 
 # Note: fg, and bg are numpy array
 def apply_fg(bg,fg, positon=(0,0), resize=(0,0), alignment='left'):
