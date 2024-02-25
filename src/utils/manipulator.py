@@ -21,9 +21,8 @@ def blend_bg(fg,bg,mask):
     # cv2.imshow('cutof_with_bg_as_mask',cutof_with_bg_as_mask)
 
     # fg_mask_tiled = np.tile(fg_mask[:,:,None],(1,1,4))
-    print(f"mask:{fg_mask.shape}")
-    print(f"fg:{fg.shape}")
 
+    bg_with_cutof_black = cv2.cvtColor(bg_with_cutof_black,cv2.COLOR_BGR2RGBA)
     blended_fg = cv2.addWeighted(fg,1,cutof_with_bg_as_mask,0.2,0)
     blended_fg_bg = blended_fg + bg_with_cutof_black
     # gaussian blur
@@ -31,7 +30,6 @@ def blend_bg(fg,bg,mask):
     output_gaus = cv2.normalize(output_gaus, None, 0, 255, cv2.NORM_MINMAX, cv2.CV_32F)
     blended = output_gaus
     # bg_with_fg_cutout= cv2.bitwise_and(bg_rgba,bg_rgba,mask=fg_mask)
-
     return (blended).astype(np.uint8)
 
 
@@ -75,7 +73,7 @@ def remove_bg_v2(frame,category_mask,replacement_color=(0,0,0)):
 
     frame_rgba = cv2.cvtColor(frame,cv2.COLOR_BGR2BGRA) # we use BGR to RGBA because the result of mp.Image().segment is BGR
 
-    bg_transparent = np.full_like(frame_rgba, replacement_color + (255,),dtype=np.uint8)
+    # bg_transparent = np.full_like(frame_rgba, replacement_color + (255,),dtype=np.uint8)
     # bg_normal = np.full_like(frame_rgba,frame_rgba,dtype=np.uint8)
     
     # I want to apply some kind of blending to smooth up the foreground image edges
@@ -90,14 +88,33 @@ def remove_bg_v2(frame,category_mask,replacement_color=(0,0,0)):
     # fg_mask_blurred = fg_mask_blurred.astype(np.uint8)
     # fg_with_removed_bg = cv2.bitwise_and(frame_rgba, frame_rgba, mask=fg_mask[..., None])
 
-    fg_with_removed_bg = cv2.bitwise_and(frame_rgba, frame_rgba,mask=fg_mask) 
-    bg_mask = cv2.bitwise_not(fg_mask)
-    # then we transparent transparent background
-    # we cut holes in it matching the foregound image
-    bg_transparent_with_removed_fg = cv2.bitwise_and(bg_transparent, bg_transparent, mask=bg_mask)
+
+
+    blurred_mask = cv2.medianBlur(fg_mask,3)
+
+    erosion_kernel = np.ones((3, 3), np.uint8)  # Adjust kernel size as needed
+    eroded_mask = cv2.erode(blurred_mask, erosion_kernel, iterations=1)
+
+    dilation_kernel = np.ones((3, 3), np.uint8)  # Adjust kernel size as needed
+    dilated_mask = cv2.dilate(eroded_mask, dilation_kernel, iterations=1)
+
+    fg_with_removed_bg = cv2.bitwise_and(frame_rgba, frame_rgba,mask=dilated_mask) 
+
+    alpha_channel = np.ones(fg_with_removed_bg.shape, dtype=np.uint8)/2.0
+    image = fg_with_removed_bg*alpha_channel
+
+    # blended_fg = cv2.addWeighted(frame_rgba,0.5,fg_with_removed_bg,0.5,0)
+
+
+    # bg_mask = cv2.bitwise_not(fg_mask)
+    # # then we transparent transparent background
+    # # we cut holes in it matching the foregound image
+    # bg_transparent_with_removed_fg = cv2.bitwise_and(bg_transparent, bg_transparent, mask=bg_mask)
 
     # then we stich it togerther forming a fg image + transparent bg
-    output = fg_with_removed_bg + bg_transparent_with_removed_fg
+    # output = fg_with_removed_bg + bg_transparent_with_removed_fg
+    # output = fg_with_removed_bg
+    output = image
 
     return cv2.cvtColor(output,cv2.COLOR_BGRA2RGBA)
 

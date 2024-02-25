@@ -1,6 +1,6 @@
 import time 
 from utils.remover import process_video
-from utils.pipeline import main
+from utils import pipeline
 VIDEO_INPUT_PATH='input/video-input.mp4'
 # VIDEO_INPUT_PATH='input/kid-dance.mp4'
 
@@ -12,7 +12,7 @@ def run():
     # formatted_time = "{:.2f} seconds".format(elapsed_time)
     # print("Program execution time:", formatted_time)
 
-    main()
+    pipeline.main()
 
 
 if __name__ == '__main__':

@@ -46,8 +46,9 @@ def create_output_process(destination_path, width, height, frame_rate=24, audio_
 
     return output_process
 
-def read_video(video_path, width, height, target_frame_rate=24):
+def read_video(video_path,target_frame_rate=24):
     # Input video file with adjusted buffer size
+    width, height = get_video_info(video_path)
     process = (
         ffmpeg.input(video_path, probesize=2*1024*1024)
         .output('pipe:', format='rawvideo', pix_fmt='bgr24', r=target_frame_rate)
