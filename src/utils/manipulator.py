@@ -118,7 +118,31 @@ def remove_bg_v2(frame,category_mask,replacement_color=(0,0,0)):
 
     return cv2.cvtColor(output,cv2.COLOR_BGRA2RGBA)
 
+def blur_bg(frame, category_mask):
+    frame_rgba = frame_rgba = cv2.cvtColor(frame,cv2.COLOR_BGR2RGBA)
 
+    # apply blur effect
+    blurred_image = cv2.GaussianBlur(frame_rgba,(55,55),0)
+
+    # try edrode and dilate
+    kernel = np.ones((5, 5), np.uint8)
+    dilated_mask = cv2.dilate(category_mask, kernel, iterations=1)
+    # eroded_mask = cv2.erode(category_mask, kernel, iterations=1)
+    # Repeat the mask for 4 channels to match the image
+    mask_rgba = np.stack((dilated_mask,) * 4, axis=-1)
+
+    # Adjust the alpha channel of the blurred image based on the dilated mask
+    opacity_value = 155
+    alpha_channel = mask_rgba[:, :, 0] * opacity_value/ 255  # Assuming 0 is background, 255 is foreground
+
+    # Set the alpha channel of the blurred image
+    blurred_image[:, :, 3] = alpha_channel
+
+    condition = alpha_channel  < 0.1
+    # output_image = np.where(condition, frame_rgba, blurred_image)
+    output_image = np.where(condition[:, :, np.newaxis],frame_rgba,blurred_image)
+    
+    return output_image
 
 
 # Note: fg, and bg are numpy array

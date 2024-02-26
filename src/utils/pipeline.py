@@ -23,7 +23,7 @@ def process_frame(image,segmenter):
     mask = result.category_mask
     mask = mask.numpy_view()
 
-    foreground_image = manipulator.remove_bg_v2(image,mask)
+    foreground_image = manipulator.blur_bg(image,mask)
 
     # new_bg = load_local_image('overlays/xp-bg.jpg')
     # applied_bg = manipulator.blend_bg(foreground_image,new_bg,mask)
