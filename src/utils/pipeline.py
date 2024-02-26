@@ -49,7 +49,8 @@ def process_frames(frames,segmenter):
     return processed_frames
 
 def write_frames(frames,width, height,dest_path = 'output'):
-    ffmpeg_process = video.create_output_process(dest_path, width, height)
+    output_oudio_path = os.path.join('audio','CBB_audio.mp3')
+    ffmpeg_process = video.create_output_process(dest_path, width, height,audio_file_path=output_oudio_path)
     with tqdm(desc="Saving video", unit=" frames") as pbar:
         for frame, _ in frames:
             if frame is None:
