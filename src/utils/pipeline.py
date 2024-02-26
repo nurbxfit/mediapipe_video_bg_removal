@@ -65,27 +65,38 @@ def write_frames(frames,width, height,dest_path = 'output'):
 
 
 def main():
+
+    run_pipeline_service(kwargs={
+        'SOURCE_FILE' : 'input/video-input.mp4',
+        'MODEL_PATH': 'models/selfie_segmenter.tflite',
+        'OUTPUT_FOLDER': 'output'
+    })
+
+def run_pipeline_service(**kwargs):
+    if not 'FRAME_RATE' in kwargs:
+        raise f'Please provide target FRAME_RATE'
+    if not 'SOURCE_FILE' in kwargs:
+        raise f"Please provide valid SOURCE_FILE path"
+    if not 'OUTPUT_FOLDER' in kwargs:
+        raise f"Please provide valid OUTPUT_FOLDER path"
+    if not 'MODEL_PATH' in kwargs:
+        raise f"Please provide valid MODEL_PATH path"
+
     start_time = time.time()
-    run_video_processing()
+    run_video_processing(kwargs['SOURCE_FILE'],kwargs['MODEL_PATH'],kwargs['OUTPUT_FOLDER'])
     end_time = time.time()
     elapsed_time = end_time - start_time
-    formatted_time = "{:.2f} seconds".format(elapsed_time)
-    print("Program execution time:", formatted_time)
+    print(f"Video Processed Elapsed time: {elapsed_time} seconds")
 
 
-
-def run_video_processing():
-    input_path = 'input/video-input.mp4'
-    # MODEL_PATH = 'models/selfie_multiclass_256x256.tflite'
-    MODEL_PATH = 'models/selfie_segmenter.tflite'
-    # image = load_local_image('input/example.jpg',)
+def run_video_processing(input_path,model_path,output_path):
     cap = load_local_video(input_path)
     width,height = video.get_video_info(input_path)
-    with segmentation.init_segmenter(MODEL_PATH,'image') as segmenter:
+    with segmentation.init_segmenter(model_path,'image') as segmenter:
         # processed_frame = process_frame(image,segmenter)
         # show_debug(processed_frame)
         processed_frames = process_frames(cap,segmenter)
-        write_frames(processed_frames,width,height)
+        write_frames(processed_frames,width,height,output_path)
     
     # # cv2.destroyAllWindows()
     # cv2.waitKey(0)

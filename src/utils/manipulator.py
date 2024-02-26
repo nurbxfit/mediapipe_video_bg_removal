@@ -100,8 +100,8 @@ def remove_bg_v2(frame,category_mask,replacement_color=(0,0,0)):
 
     fg_with_removed_bg = cv2.bitwise_and(frame_rgba, frame_rgba,mask=dilated_mask) 
 
-    alpha_channel = np.ones(fg_with_removed_bg.shape, dtype=np.uint8)/2.0
-    image = fg_with_removed_bg*alpha_channel
+    # alpha_channel = np.ones(fg_with_removed_bg.shape, dtype=np.uint8)/2.0
+    # image = fg_with_removed_bg*alpha_channel
 
     # blended_fg = cv2.addWeighted(frame_rgba,0.5,fg_with_removed_bg,0.5,0)
 
@@ -114,7 +114,7 @@ def remove_bg_v2(frame,category_mask,replacement_color=(0,0,0)):
     # then we stich it togerther forming a fg image + transparent bg
     # output = fg_with_removed_bg + bg_transparent_with_removed_fg
     # output = fg_with_removed_bg
-    output = image
+    output = fg_with_removed_bg
 
     return cv2.cvtColor(output,cv2.COLOR_BGRA2RGBA)
 
