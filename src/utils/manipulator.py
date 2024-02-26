@@ -119,7 +119,7 @@ def remove_bg_v2(frame,category_mask,replacement_color=(0,0,0)):
     return cv2.cvtColor(output,cv2.COLOR_BGRA2RGBA)
 
 def blur_bg(frame, category_mask):
-    frame_rgba = frame_rgba = cv2.cvtColor(frame,cv2.COLOR_BGR2RGBA)
+    frame_rgba = cv2.cvtColor(frame,cv2.COLOR_BGR2RGBA)
 
     # apply blur effect
     blurred_image = cv2.GaussianBlur(frame_rgba,(55,55),0)
@@ -143,6 +143,45 @@ def blur_bg(frame, category_mask):
     output_image = np.where(condition[:, :, np.newaxis],frame_rgba,blurred_image)
     
     return output_image
+
+def blend_blur_bg(fg, bg, category_mask):
+    # Resize category mask
+    category_mask_resized = cv2.resize(category_mask, (fg.shape[1], fg.shape[0]))
+    kernel = np.ones((5, 5), np.uint8)
+    dilated_mask = cv2.dilate(category_mask_resized, kernel, iterations=1)
+    mask_rgba = np.stack((dilated_mask,) * 4, axis=-1)
+
+    opacity_value = 155
+    alpha_channel = mask_rgba[:, :, 0] * opacity_value / 255
+
+    # Resize bg to match fg
+    bg = cv2.resize(bg, (fg.shape[1], fg.shape[0]))
+
+    # Ensure bg has an alpha channel
+    bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGBA)
+
+    # Normalize alpha mask to be between 0 to 255
+    alpha = (alpha_channel * 255).astype(np.uint8)
+
+    # Resize alpha channel to match fg
+    alpha_resized = cv2.resize(alpha, (fg.shape[1], fg.shape[0]))
+
+    # Convert fg to the same data type as alpha_resized
+    fg = fg.astype(alpha_resized.dtype)
+
+    # print(f"alpha_resized:{alpha_resized.shape}")
+    # print(f"fg:{fg.shape}")
+
+    # Multiply the foreground with the alpha matte
+    foreground = cv2.multiply(alpha_resized, fg[:, :, :3])
+
+    # Multiply the background with (1 - alpha)
+    background = cv2.multiply(1.0 - alpha_resized, bg[:, :, :3])
+
+    # Add the masked foreground and background.
+    blended_img = cv2.add(foreground, background)
+    return blended_img
+
 
 
 # Note: fg, and bg are numpy array

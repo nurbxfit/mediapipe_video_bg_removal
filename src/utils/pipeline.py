@@ -17,18 +17,20 @@ timestamp = 0
 def process_frame(image,segmenter):
     # how do I check if image passed is actually a numpy array ?
     # if  image.shape ? help me!
+    new_bg = load_local_image('overlays/xp-bg.jpg')
+
     global timestamp
     timestamp +=1
     result = segmentation.get_segmented_frame(image,segmenter)
     mask = result.category_mask
     mask = mask.numpy_view()
 
-    foreground_image = manipulator.blur_bg(image,mask)
+    output_image = manipulator.blur_bg(image,mask)
+    output_image = manipulator.blend_blur_bg(output_image,new_bg,mask)
 
-    # new_bg = load_local_image('overlays/xp-bg.jpg')
     # applied_bg = manipulator.blend_bg(foreground_image,new_bg,mask)
     # return applied_bg, timestamp
-    return foreground_image , timestamp
+    return output_image , timestamp
 
 def process_frames(frames,segmenter):
     
