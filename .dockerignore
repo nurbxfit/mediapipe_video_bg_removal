@@ -1,0 +1,11 @@
+**/output/*.mp4
+**/uploads/*
+
+__pycache__
+**/.venv
+
+**/__pycache__/
+
+.git
+
+**/.git/*
