@@ -59,7 +59,14 @@ deactivate
 ## (26/2/2024) Http Server
 
 - added simple HttpServer to upload video and query processed video
-- sever can be run using docker
+
+```
+cd src && python main.py
+```
+
+then can open postman and upload video to `http://localhost:5000/upload`
+
+- sever can be run using docker (currently not working)
 
 ```
 docker build -t video-server .
