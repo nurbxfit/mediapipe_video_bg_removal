@@ -38,7 +38,8 @@ def process_video(video_path,model_path=MODEL_PATH):
         width, height = get_video_info(video_path)
         print(f"WIDTH:{width}, HEIGHT: {height}")
 
-        ffmpeg_process = create_output_process('output', width, height)
+        output_audio_path = os.path.join('audio','CBB_audio.mp3')
+        ffmpeg_process = create_output_process('output', width, height, audio_file_path=output_audio_path)
 
         processed_frames = []
         

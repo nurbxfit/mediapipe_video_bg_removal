@@ -22,15 +22,28 @@ def get_video_stream(streams):
     raise Exception("Failed to find video stream!")
 
 
-def create_output_process(destination_path,width, height, frame_rate = 24):
-    os.makedirs(destination_path,exist_ok=True)
-    output_file_path = os.path.join(destination_path,'output.mp4')
-    output_process = (
-            ffmpeg.input('pipe:', format='rawvideo', pix_fmt='rgba', s='{}x{}'.format(width, height))
-            .output(output_file_path, vcodec='libx264', pix_fmt='yuv420p', r=frame_rate,colorspace='bt709')
+def create_output_process(destination_path, width, height, frame_rate=24, audio_file_path=None):
+    os.makedirs(destination_path, exist_ok=True)
+    output_file_path = os.path.join(destination_path, 'output.mp4')
+
+    ffmpeg_input = ffmpeg.input('pipe:', format='rawvideo', pix_fmt='rgba', s='{}x{}'.format(width, height))
+
+    if audio_file_path:
+        ffmpeg_audio_input = ffmpeg.input(audio_file_path)
+        output_process = (
+            ffmpeg.concat(ffmpeg_input, ffmpeg_audio_input, v=1, a=1)
+            .output(output_file_path, vcodec='libx264', pix_fmt='yuv420p', r=frame_rate, acodec='aac', strict='experimental',shortest=None)
             .overwrite_output()
             .run_async(pipe_stdin=True)
         )
+    else:
+        output_process = (
+            ffmpeg_input
+            .output(output_file_path, vcodec='libx264', pix_fmt='yuv420p', r=frame_rate, acodec='aac', strict='experimental')
+            .overwrite_output()
+            .run_async(pipe_stdin=True)
+        )
+
     return output_process
 
 def read_video(video_path, width, height, target_frame_rate=24):
