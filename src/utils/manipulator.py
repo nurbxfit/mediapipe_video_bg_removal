@@ -146,41 +146,28 @@ def blur_bg(frame, category_mask):
 
 def blend_blur_bg(fg, bg, category_mask):
     # Resize category mask
-    category_mask_resized = cv2.resize(category_mask, (fg.shape[1], fg.shape[0]))
-    kernel = np.ones((5, 5), np.uint8)
-    dilated_mask = cv2.dilate(category_mask_resized, kernel, iterations=1)
-    mask_rgba = np.stack((dilated_mask,) * 4, axis=-1)
+    # category_mask_resized = cv2.resize(category_mask, (fg.shape[1], fg.shape[0]))
+    # kernel = np.ones((5, 5), np.uint8)
+    # dilated_mask = cv2.dilate(category_mask_resized, kernel, iterations=1)
+    # mask_rgba = np.stack((dilated_mask,) * 4, axis=-1)
 
-    opacity_value = 155
-    alpha_channel = mask_rgba[:, :, 0] * opacity_value / 255
+    # opacity_value = 155
+    # mask_rgba[:, :, 3] = mask_rgba[:, :, 0] * opacity_value / 255
 
     # Resize bg to match fg
     bg = cv2.resize(bg, (fg.shape[1], fg.shape[0]))
 
-    # Ensure bg has an alpha channel
-    bg = cv2.cvtColor(bg, cv2.COLOR_BGR2RGBA)
+     # if dont have alpha channel, then add an alpha channel to the background with fully opaque values
+    if bg.shape[2] == 3:
+        bg = cv2.cvtColor(bg, cv2.COLOR_BGR2BGRA)
+        bg[:, :, 3] = 255
 
-    # Normalize alpha mask to be between 0 to 255
-    alpha = (alpha_channel * 255).astype(np.uint8)
+    print(f"bg:{bg.shape}, {bg.dtype}")
+    print(f"fg:{fg.shape}, {fg.dtype}")
+    print(f"category_mask:{category_mask.shape}, {category_mask.dtype}")
 
-    # Resize alpha channel to match fg
-    alpha_resized = cv2.resize(alpha, (fg.shape[1], fg.shape[0]))
-
-    # Convert fg to the same data type as alpha_resized
-    fg = fg.astype(alpha_resized.dtype)
-
-    # print(f"alpha_resized:{alpha_resized.shape}")
-    # print(f"fg:{fg.shape}")
-
-    # Multiply the foreground with the alpha matte
-    foreground = cv2.multiply(alpha_resized, fg[:, :, :3])
-
-    # Multiply the background with (1 - alpha)
-    background = cv2.multiply(1.0 - alpha_resized, bg[:, :, :3])
-
-    # Add the masked foreground and background.
-    blended_img = cv2.add(foreground, background)
-    return blended_img
+    blended_img = cv2.addWeighted(fg,0.5,bg,0.5,0)
+    return blended_img.astype(np.uint8)
 
 
 
