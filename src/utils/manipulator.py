@@ -162,11 +162,29 @@ def blend_blur_bg(fg, bg, category_mask):
         bg = cv2.cvtColor(bg, cv2.COLOR_BGR2BGRA)
         bg[:, :, 3] = 255
 
-    print(f"bg:{bg.shape}, {bg.dtype}")
-    print(f"fg:{fg.shape}, {fg.dtype}")
-    print(f"category_mask:{category_mask.shape}, {category_mask.dtype}")
+    # print(f"bg:{bg.shape}, {bg.dtype}")
+    # print(f"fg:{fg.shape}, {fg.dtype}")
+    # print(f"category_mask:{category_mask.shape}, {category_mask.dtype}")
 
-    blended_img = cv2.addWeighted(fg,0.5,bg,0.5,0)
+    # Ensure category_mask is in the range [0, 1]
+    # opacity_value = 155
+    # alpha = category_mask.astype(float) * opacity_value / 255.0
+    # Convert alpha to a compatible type for cv2.addWeighted
+    # alpha = alpha.astype(np.float32)
+
+    # print(f"alpha:{alpha.shape}, {alpha.dtype}")
+    # print(f"alpha_value:{alpha}")
+
+    # blended_img = cv2.addWeighted(fg,alpha,bg,alpha_inverse,0)
+    # Perform element-wise multiplication for alpha blending
+    # fg[:, :, :3] = fg[:, :, :3] * (1 - alpha[:, :, np.newaxis]) 
+    # bg[:, :, :3] = bg[:, :, :3] * alpha[:, :, np.newaxis]
+
+    # Sum the two images to get the final blended result
+    # blended_img = cv2.add(fg, bg)
+    alpha = 0.8
+    blended_img = cv2.addWeighted(fg,alpha,bg,1-alpha,0)
+
     return blended_img.astype(np.uint8)
 
 
