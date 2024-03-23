@@ -55,3 +55,23 @@ deactivate
 - only takes 30 seconds when using selfie_segmenter model
 - only takes 2.3 minutes when using selfie_multiclass_256x256 model
 - able to remove jitter/glitch on output video when using threadpools.
+
+## (26/2/2024) Http Server
+
+- added simple HttpServer to upload video and query processed video
+
+```
+cd src && python main.py
+```
+
+then can open postman and upload video to `http://localhost:5000/upload`
+
+- sever can be run using docker (currently not working)
+
+```
+docker build -t video-server .
+```
+
+```
+docker run -p 5000:5000 --name video-server video-server
+```

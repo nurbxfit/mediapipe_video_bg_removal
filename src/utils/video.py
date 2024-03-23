@@ -3,6 +3,7 @@ import os
 import numpy as np
 import cv2
 import time
+from tqdm import tqdm
 
 def get_video_info(video_path):
     try:
@@ -46,8 +47,9 @@ def create_output_process(destination_path, width, height, frame_rate=24, audio_
 
     return output_process
 
-def read_video(video_path, width, height, target_frame_rate=24):
+def read_video(video_path,target_frame_rate=24):
     # Input video file with adjusted buffer size
+    width, height = get_video_info(video_path)
     process = (
         ffmpeg.input(video_path, probesize=2*1024*1024)
         .output('pipe:', format='rawvideo', pix_fmt='bgr24', r=target_frame_rate)
@@ -86,3 +88,16 @@ def parse_frame_rate(frame_rate_str): # eg: "60/1"
     return numerator / denominator
 
 
+def write_frames(frames,width,height,output_path):
+    ffmpeg_process = create_output_process(output_path, width, height)
+    
+    with tqdm(desc="Saving video frames", unit=" frames") as pbar:
+        for frame, _ in frames:
+            if frame is None:
+                pass
+            else:
+                ffmpeg_process.stdin.write(frame)
+                pbar.update(1)
+
+    ffmpeg_process.stdin.close()
+    ffmpeg_process.wait()
