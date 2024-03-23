@@ -14,7 +14,7 @@ then it seperate the background from the segmented foreground.
 1. cd into this directory
 
 ```
-cd bgRemove
+cd py_video_bg_remover
 ```
 
 2. create new virtual environment
@@ -65,6 +65,8 @@ cd src && python main.py
 ```
 
 then can open postman and upload video to `http://localhost:5000/upload`
+then can start processing by provide the video_id to `http://localhost:5000/remove-bg/video`
+then can query back the processed video at `http://localhost:5000/video/<videoId>`
 
 - sever can be run using docker (currently not working)
 
