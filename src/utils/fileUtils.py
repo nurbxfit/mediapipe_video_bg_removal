@@ -37,3 +37,10 @@ def gen_cuid():
 def get_ext(file_name):
     _,file_extension = os.path.splitext(file_name)
     return file_extension[1:] # remove "." in ".mp4"
+
+
+def dir_exist(dir_path):
+    return os.path.exists(dir_path) and os.path.isdir(dir_path)
+
+def file_exist(file_path):
+    return os.path.exists(file_path) and os.path.isfile(file_path)

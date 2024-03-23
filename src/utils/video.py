@@ -3,6 +3,7 @@ import os
 import numpy as np
 import cv2
 import time
+from tqdm import tqdm
 
 def get_video_info(video_path):
     try:
@@ -87,3 +88,16 @@ def parse_frame_rate(frame_rate_str): # eg: "60/1"
     return numerator / denominator
 
 
+def write_frames(frames,width,height,output_path):
+    ffmpeg_process = create_output_process(output_path, width, height)
+    
+    with tqdm(desc="Saving video frames", unit=" frames") as pbar:
+        for frame, _ in frames:
+            if frame is None:
+                pass
+            else:
+                ffmpeg_process.stdin.write(frame)
+                pbar.update(1)
+
+    ffmpeg_process.stdin.close()
+    ffmpeg_process.wait()
