@@ -1,0 +1,8 @@
+{
+    "DEFAULT_UPLOAD_FOLDER" : "uploads",
+    "DEFAULT_OUTPUT_FOLDER" : "output",
+    "DEFAULT_OVERLAYS_FOLDER": "overlays",
+    "DEFAULT_INPUT_FOLDER" : "input",
+    "DEFAULT_MODEL_PATH": "models/selfie_segmenter.tflite",
+    "MAX_REMOVAL_WORKERS" : 4
+}
