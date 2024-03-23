@@ -86,4 +86,4 @@ docker run -p 5000:5000 --name video-server video-server
 ### Output
 ![output image](/screenshots/output.png)
 
-The output is not perfect but you can adjust it yousefl, just look into the `src/utils/workflow.py` and adjust it there
+The output is not perfect because it depends on the mediapipe segmentation model. but you can tune the result using opencv by looking into the file `src/utils/workflow.py`.
