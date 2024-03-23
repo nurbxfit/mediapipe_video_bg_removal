@@ -77,3 +77,13 @@ docker build -t video-server .
 ```
 docker run -p 5000:5000 --name video-server video-server
 ```
+
+# Example 
+
+### Input 
+![input image](/screenshots/input.png)
+
+### Output
+![output image](/screenshots/output.png)
+
+The output is not perfect but you can adjust it yousefl, just look into the `src/utils/workflow.py` and adjust it there
