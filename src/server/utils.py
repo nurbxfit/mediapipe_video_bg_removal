@@ -2,7 +2,7 @@ import os
 from config.loader import config
 from utils import fileUtils
 import hashlib
-
+import shutil
 
 
 def get_video_path(video_id):
@@ -36,5 +36,8 @@ def save_video(video, save_file_path):
     # print(f"save_file_dir:{save_file_dir}")
     fileUtils.assert_dir(save_file_dir)
     # Seek to the beginning of the file
-    video.seek(0)
-    video.save(save_file_path)
+
+    video.file.seek(0)
+    # video.save(save_file_path)
+    with open(save_file_path, 'wb') as new_file:
+        shutil.copyfileobj(video.file, new_file)

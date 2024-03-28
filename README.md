@@ -63,19 +63,10 @@ deactivate
 ```
 cd src && python main.py
 ```
-
-then can open postman and upload video to `http://localhost:5000/upload`
-then can start processing by provide the video_id to `http://localhost:5000/remove-bg/video`
-then can query back the processed video at `http://localhost:5000/video/<videoId>`
-
-- sever can be run using docker (currently not working)
-
+## (28/3/2024) Migrate from flask to FastAPI
+can view the swagger here
 ```
-docker build -t video-server .
-```
-
-```
-docker run -p 5000:5000 --name video-server video-server
+http://0.0.0.0:5001/docs
 ```
 
 # Example 

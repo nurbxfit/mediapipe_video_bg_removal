@@ -1,12 +1,8 @@
-from flask import Flask
-from flask_restful import Api
-from server.routes import UploadHttpRoute, VideoHttpRoute, ProcessingHttpRoute
-
+from fastapi import FastAPI
+from server.routes import VideoHttpRoute
 def create_app():
-    app = Flask(__name__)
-    api = Api(app)
+    app = FastAPI()
 
-    api.add_resource(UploadHttpRoute.Upload, '/upload')
-    api.add_resource(VideoHttpRoute.QueryVideo, '/video/<string:video_id>')
-    api.add_resource(ProcessingHttpRoute.RemoveBackground, '/remove-bg/video')
+    app.include_router(VideoHttpRoute.router)
+
     return app
