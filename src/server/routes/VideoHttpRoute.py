@@ -1,6 +1,5 @@
-from server.validation import validate_video_id
 from server.utils import get_video_path, get_ext ,get_file_hash ,check_hash_file_existed, save_video
-from werkzeug.exceptions import BadRequest
+from server.validation import validate_video_id
 import os
 from config.loader import config
 from utils.remover import run_remove_bg_process
@@ -26,7 +25,7 @@ async def query_video(video_id: str):
         _, video_path = get_video_path(video_id) 
         if not os.path.exists(video_path):
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Item not found matching the given ID')
-    except BadRequest as e:
+    except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Invalid video ID')
     
     return FileResponse(video_path)
